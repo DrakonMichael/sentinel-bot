@@ -187,10 +187,10 @@ const getDataEmbed = () => {
         .addFields(
             { name: 'Correct Tiles', value: (totalPixels-totalIncorrect).toString(), inline: true },
             { name: 'Incorrect Tiles', value: (totalIncorrect).toString(), inline: true },
-            { name: 'Raw Computed Progress', value: `${totalPixels-totalIncorrect}/${totalPixels}`, inline: true },
-            { name: 'Adjusted Progress', value: `${totalPixels-totalIncorrect + adjustmentFactor}/${totalPixels}`, inline: true },
-            { name: 'Raw Computed Accuracy', value: percentage.toFixed(3).toString() + "%", inline: true },
-            { name: 'Adjusted Accuracy', value: percentageAdjusted.toFixed(3).toString() + "%", inline: true }
+            { name: 'Progress', value: `${totalPixels-totalIncorrect}/${totalPixels}`, inline: true },
+            //{ name: 'Adjusted Progress', value: `${totalPixels-totalIncorrect + adjustmentFactor}/${totalPixels}`, inline: true },
+            { name: 'Accuracy', value: percentage.toFixed(3).toString() + "%", inline: true }
+            //{ name: 'Adjusted Accuracy', value: percentageAdjusted.toFixed(3).toString() + "%", inline: true }
         )
         .setTimestamp()
         .setFooter({ text: 'Created by DrakonMichael for r/VALORANT' });
