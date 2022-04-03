@@ -1,0 +1,7 @@
+{
+  "dependencies": {
+    "discord.js": "^13.6.0",
+    "jimp": "^0.16.1",
+    "puppeteer": "^13.5.2"
+  }
+}
