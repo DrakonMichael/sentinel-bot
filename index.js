@@ -1,7 +1,6 @@
 const puppeteer = require('puppeteer');
 const fs = require('fs');
 let Jimp = require('jimp');
-let widejoyData = require("./imgdata.json");
 let accounts = require("./accounts.json");
 const { createCanvas, Image } = require("canvas");
 // Require the necessary discord.js classes
@@ -21,8 +20,11 @@ const HEIGHT = 25;
 const MESSAGE_INTERVAL = 5;
 const ACCURACY_UPDATES_CHANNEL = '960042266905444382';
 
-// Gets filled with the page object and can be used to interact with the r/place canvas
+// Gets filled with the page object when reddit loads and can be used to interact with the r/place canvas
 let page;
+
+// Gets filled with the data from the widejoy template
+let widejoyData;
 
 
 Jimp.read('./input.png', (err, img) => {
@@ -54,8 +56,7 @@ Jimp.read('./input.png', (err, img) => {
                 "orange": [255, 168, 0],
                 "light green": [126, 237, 86],
                 "dark green": [0, 163, 104],
-                "blue": [54, 144, 234],
-                "NOCOLOR": [69, 69, 69]
+                "blue": [54, 144, 234]
             }
 
             // Find the closest pixel
@@ -74,13 +75,12 @@ Jimp.read('./input.png', (err, img) => {
             color[1] = colours[name][1];
             color[2] = colours[name][2];
 
-            let c = {rgb: color, name: name};
-            arr[x][y] = c;
+            arr[x][y] = {rgb: color, name: name};
         }
     }
 
     widejoyData = arr;
-    fs.writeFileSync('imgdata.json', JSON.stringify(arr));
+    // fs.writeFileSync('imgdata.json', JSON.stringify(arr));
 
 });
 
@@ -149,14 +149,11 @@ async function getErrors() {
                 const [r, g, b, a] = [canvasData[redIndex], canvasData[greenIndex], canvasData[blueIndex], canvasData[alphaIndex]];
                 const prgb = widejoyData[x][y].rgb;
 
-                if (widejoyData[x][y] !== "NOCOLOR") {
-                    totalPixels++;
-                    if (r !== prgb.r || g !== prgb.g || b !== prgb.b) {
-                        errors.push({coords: {x: x + TOP_LEFT.x, y: y + TOP_LEFT.y}, color: widejoyData[x][y].name})
-                        totalIncorrect++;
-                    }
+                totalPixels++;
+                if (r !== prgb.r || g !== prgb.g || b !== prgb.b) {
+                    errors.push({coords: {x: x + TOP_LEFT.x, y: y + TOP_LEFT.y}, color: widejoyData[x][y].name})
+                    totalIncorrect++;
                 }
-
             }
         }
         return {totalPixels, totalIncorrect};
