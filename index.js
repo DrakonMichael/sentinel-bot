@@ -12,13 +12,17 @@ const client = new Client({ intents: [Intents.FLAGS.GUILDS, Intents.FLAGS.GUILD_
 
 
 let ad = {};
-let totalPixels = 0;
-let totalIncorrect = 0;
 let imageBufferData = [];
 
-let TOP_LEFT = {x: 110, y: 805}
-let WIDTH = 120
-let HEIGHT = 25
+const TOP_LEFT = {x: 110, y: 805};
+const WIDTH = 120;
+const HEIGHT = 25;
+
+const MESSAGE_INTERVAL = 5;
+const ACCURACY_UPDATES_CHANNEL = '960042266905444382';
+
+// Gets filled with the page object and can be used to interact with the r/place canvas
+let page;
 
 
 Jimp.read('./input.png', (err, img) => {
@@ -87,17 +91,15 @@ const getColorIndicesForCoord = (x, y, width) => {
 };
 
 
-let username = Object.keys(accounts)[0];
-let password = accounts[username];
-createAccount(username, password);
+async function createAccount() {
+    let username = Object.keys(accounts)[0];
+    let password = accounts[username];
 
-
- async function createAccount(username, password) {
     ad[username] = {status: "INIT", username: username, password: password, eta: "N/A", action: "Initializing"};
     const browser = await puppeteer.launch({
         headless: true
     });
-    const page = await browser.newPage();
+    page = await browser.newPage();
     await page.setDefaultNavigationTimeout(0);
     ad[username].action = "Navigating to login";
     await page.goto('https://www.reddit.com/login/');
@@ -107,13 +109,10 @@ createAccount(username, password);
     await page.click("body > div > main > div.OnboardingStep.Onboarding__step.mode-auth > div > div.Step__content > form > fieldset:nth-child(8) > button");
     await page.waitForNavigation({'waitUntil':'domcontentloaded'});
     ad[username].action = "Redirecting to r/place";
-
-    getErrors(page);
-    setInterval(() => {getErrors(page);}, 60000)
 }
 
 
-async function getErrors(page) {
+async function getErrors() {
     try {
         await page.goto('https://www.reddit.com/r/place/?cx=' + 0 + '&cy=' + 0 + '&px=17');
         const iframe = await page.$("#SHORTCUT_FOCUSABLE_DIV > div:nth-child(4) > div > div > div > div._3ozFtOe6WpJEMUtxDOIvtU > div._2lTcCESjnP_DKJcPBqBFLK > iframe");
@@ -140,9 +139,9 @@ async function getErrors(page) {
 
         imageBufferData = [...canvasData];
 
-        let errors = []
-        totalIncorrect = 0;
-        totalPixels = 0;
+        let errors = [];
+        let totalIncorrect = 0;
+        let totalPixels = 0;
         for (let x = 0; x < WIDTH; x++) {
             for (let y = 0; y < HEIGHT; y++) {
                 const colorIndices = getColorIndicesForCoord(x, y, WIDTH);
@@ -160,7 +159,8 @@ async function getErrors(page) {
 
             }
         }
-        console.log("got data (" + totalIncorrect + " incorrect)");
+        return {totalPixels, totalIncorrect};
+
     } catch (err) {
         console.log(err);
         return;
@@ -170,32 +170,29 @@ async function getErrors(page) {
 
 async function getCanvasData(canvasPage) {
     return canvasPage.$eval("pierce/canvas", (cv) => {
-        let TOP_LEFT = {x: 110, y: 805}
-        let WIDTH = 120
-        let HEIGHT = 25
+        // WHY WHY WHY DOES THIS NEED TO BE HERE ASEOUVMA;SEIURT;AOPIUNBO
+        let TOP_LEFT = {x: 110, y: 805};
+        let WIDTH = 120;
+        let HEIGHT = 25;
         return Object.values(cv.getContext("2d").getImageData(TOP_LEFT.x, TOP_LEFT.y, WIDTH, HEIGHT).data);
     });
 }
 
 
-function sleep(ms) {
-    return new Promise(resolve => setTimeout(resolve, ms));
-}
-
-
 // When the client is ready, run this code (only once)
 client.once('ready', async () => {
-    console.log('Ready! Preparing to send in 20 seconds...');
+    console.log('(1/2) Logged into Discord');
 
-    await sleep(20 * 1000);
-    
-    let ACCURACY_UPDATES_CHANNEL = '960042266905444382';
+    // Now log into Reddit
+    await createAccount();
+    console.log('(2/2) Logged into Reddit');
+
     client.channels.fetch(ACCURACY_UPDATES_CHANNEL)
         .then(channel => {
             sendMessage(channel);
             setInterval(() => {
                 sendMessage(channel);
-            }, 1000*(5*60))
+            }, 1000 * (MESSAGE_INTERVAL * 60));
         })
         .catch(console.error);
 });
@@ -203,37 +200,28 @@ client.once('ready', async () => {
 
 async function sendMessage(channel) {
 
+    // From the reddit canvas, calculate the percentage of correct pixels
+    let {totalPixels, totalIncorrect} = await getErrors();
+    let percentage = ((totalPixels-totalIncorrect)/totalPixels)*100;
+
     let imageBuffer = Buffer.from(imageBufferData);
     const imageAttachment = new MessageAttachment(imageBuffer, "killjoy-status-" + Date.now());
 
-    // First generate the embed to be sent
-    // depending on if any data has been fetched yet or not
-    let embed = null;
-    if (totalPixels === 0) {
-        embed = new MessageEmbed()
-            .setColor('#ff6666')
-            .setTitle('Waiting for pixel data...')
-    }
-    else {
-        let percentage = ((totalPixels-totalIncorrect)/totalPixels)*100;
-
-
-        embed = new MessageEmbed()
-            .setColor('#ff6666')
-            .setTitle('Widejoy Progress Update')
-            .setDescription('**NARROW THEIR OPTIONS // WIDEN OUR JOY** <:perfectwidejoy:960300099060265071>')
-            .addFields(
-                { name: 'Correct Tiles', value: (totalPixels-totalIncorrect).toString(), inline: true },
-                { name: 'Incorrect Tiles', value: (totalIncorrect).toString(), inline: true },
-                { name: 'Progress', value: `${totalPixels-totalIncorrect}/${totalPixels}`, inline: true },
-                //{ name: 'Adjusted Progress', value: `${totalPixels-totalIncorrect + adjustmentFactor}/${totalPixels}`, inline: true },
-                { name: 'Accuracy', value: percentage.toFixed(3).toString() + "%", inline: true }
-                //{ name: 'Adjusted Accuracy', value: percentageAdjusted.toFixed(3).toString() + "%", inline: true }
-            )
-            .setImage(`attachment://${imageAttachment.name}`)
-            .setTimestamp()
-            .setFooter({ text: 'Created by DrakonMichael & Histefanhere for r/VALORANT' });
-    }
+    embed = new MessageEmbed()
+        .setColor('#ff6666')
+        .setTitle('Widejoy Progress Update')
+        .setDescription('**NARROW THEIR OPTIONS // WIDEN OUR JOY** <:perfectwidejoy:960300099060265071>')
+        .addFields(
+            { name: 'Correct Tiles', value: (totalPixels-totalIncorrect).toString(), inline: true },
+            { name: 'Incorrect Tiles', value: (totalIncorrect).toString(), inline: true },
+            { name: 'Progress', value: `${totalPixels-totalIncorrect}/${totalPixels}`, inline: true },
+            //{ name: 'Adjusted Progress', value: `${totalPixels-totalIncorrect + adjustmentFactor}/${totalPixels}`, inline: true },
+            { name: 'Accuracy', value: percentage.toFixed(3).toString() + "%", inline: true }
+            //{ name: 'Adjusted Accuracy', value: percentageAdjusted.toFixed(3).toString() + "%", inline: true }
+        )
+        .setImage(`attachment://${imageAttachment.name}`)
+        .setTimestamp()
+        .setFooter({ text: 'Created by DrakonMichael & Histefanhere for r/VALORANT' });
 
     // Send the messeage to the provided channel!
     console.log("Sending message... (Incorrect tiles: " + (totalIncorrect).toString() + ")");
