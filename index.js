@@ -11,8 +11,6 @@ const { Client, Intents, MessageEmbed, MessageAttachment } = require('discord.js
 const client = new Client({ intents: [Intents.FLAGS.GUILDS, Intents.FLAGS.GUILD_MESSAGES] });
 
 
-
-
 let ad = {};
 let totalPixels = 0;
 let totalIncorrect = 0;
@@ -22,15 +20,9 @@ let TOP_LEFT = {x: 110, y: 805}
 let WIDTH = 120
 let HEIGHT = 25
 
-let DEBUG_GENERATE_IMAGE_FROM_IMGDATA = false;
 
 Jimp.read('./input.png', (err, img) => {
     if (err) throw err;
-
-    const canvas = createCanvas(120, 25);
-    const context = canvas.getContext("2d");
-    let im = context.createImageData(1, 1);
-    let d = im.data;
 
     let arr = [];
     for(let x = 0; x < WIDTH; x++) {
@@ -78,31 +70,21 @@ Jimp.read('./input.png', (err, img) => {
             color[1] = colours[name][1];
             color[2] = colours[name][2];
 
-            d[0] = colours[name][0];
-            d[1] = colours[name][1];
-            d[2] = colours[name][2];
-            d[3] = a;
-            context.putImageData(im, x, y);
-
             let c = {rgb: color, name: name};
-
-
             arr[x][y] = c;
         }
     }
+
     widejoyData = arr;
     fs.writeFileSync('imgdata.json', JSON.stringify(arr));
 
 });
 
+
 const getColorIndicesForCoord = (x, y, width) => {
     const red = y * (width * 4) + x * 4;
     return [red, red + 1, red + 2, red + 3];
 };
-
-
-
-
 
 
 let username = Object.keys(accounts)[0];
@@ -111,79 +93,80 @@ createAccount(username, password);
 
 
  async function createAccount(username, password) {
-        ad[username] = {status: "INIT", username: username, password: password, eta: "N/A", action: "Initializing"};
-        const browser = await puppeteer.launch({
-            headless: true
-        });
-        const page = await browser.newPage();
-        await page.setDefaultNavigationTimeout(0);
-        ad[username].action = "Navigating to login";
-        await page.goto('https://www.reddit.com/login/');
-        ad[username].action = "Logging in";
-        await page.type('#loginUsername', username)
-        await page.type("#loginPassword", password)
-        await page.click("body > div > main > div.OnboardingStep.Onboarding__step.mode-auth > div > div.Step__content > form > fieldset:nth-child(8) > button");
-        await page.waitForNavigation({'waitUntil':'domcontentloaded'});
-        ad[username].action = "Redirecting to r/place";
+    ad[username] = {status: "INIT", username: username, password: password, eta: "N/A", action: "Initializing"};
+    const browser = await puppeteer.launch({
+        headless: true
+    });
+    const page = await browser.newPage();
+    await page.setDefaultNavigationTimeout(0);
+    ad[username].action = "Navigating to login";
+    await page.goto('https://www.reddit.com/login/');
+    ad[username].action = "Logging in";
+    await page.type('#loginUsername', username)
+    await page.type("#loginPassword", password)
+    await page.click("body > div > main > div.OnboardingStep.Onboarding__step.mode-auth > div > div.Step__content > form > fieldset:nth-child(8) > button");
+    await page.waitForNavigation({'waitUntil':'domcontentloaded'});
+    ad[username].action = "Redirecting to r/place";
 
-        getErrors(page);
-        setInterval(() => {getErrors(page);}, 60000)
-
+    getErrors(page);
+    setInterval(() => {getErrors(page);}, 60000)
 }
+
 
 async function getErrors(page) {
-     try {
-         await page.goto('https://www.reddit.com/r/place/?cx=' + 0 + '&cy=' + 0 + '&px=17');
-         const iframe = await page.$("#SHORTCUT_FOCUSABLE_DIV > div:nth-child(4) > div > div > div > div._3ozFtOe6WpJEMUtxDOIvtU > div._2lTcCESjnP_DKJcPBqBFLK > iframe");
-         const canvasPage = await iframe.contentFrame();
-         await page.click("#SHORTCUT_FOCUSABLE_DIV > div:nth-child(4) > div > div > div > div._3ozFtOe6WpJEMUtxDOIvtU > div._2lTcCESjnP_DKJcPBqBFLK > iframe");
+    try {
+        await page.goto('https://www.reddit.com/r/place/?cx=' + 0 + '&cy=' + 0 + '&px=17');
+        const iframe = await page.$("#SHORTCUT_FOCUSABLE_DIV > div:nth-child(4) > div > div > div > div._3ozFtOe6WpJEMUtxDOIvtU > div._2lTcCESjnP_DKJcPBqBFLK > iframe");
+        const canvasPage = await iframe.contentFrame();
+        await page.click("#SHORTCUT_FOCUSABLE_DIV > div:nth-child(4) > div > div > div > div._3ozFtOe6WpJEMUtxDOIvtU > div._2lTcCESjnP_DKJcPBqBFLK > iframe");
 
-         let canvasData = await getCanvasData(canvasPage);
-         let emptyCanvas = true;
+        let canvasData = await getCanvasData(canvasPage);
+        let emptyCanvas = true;
 
-         while (emptyCanvas) {
-             canvasData = await getCanvasData(canvasPage);
+        while (emptyCanvas) {
+            canvasData = await getCanvasData(canvasPage);
 
-             let sum = 0;
-             for (let i = 0; i < canvasData.length; i++) {
-                 sum += canvasData[i];
-             }
+            let sum = 0;
+            for (let i = 0; i < canvasData.length; i++) {
+                sum += canvasData[i];
+            }
 
-             if (sum === 0) {
-                 await (page.waitForTimeout(1000));
-             } else {
-                 emptyCanvas = false;
-             }
-         }
+            if (sum === 0) {
+                await (page.waitForTimeout(1000));
+            } else {
+                emptyCanvas = false;
+            }
+        }
 
-         imageBufferData = [...canvasData];
+        imageBufferData = [...canvasData];
 
-         let errors = []
-         totalIncorrect = 0;
-         totalPixels = 0;
-         for (let x = 0; x < WIDTH; x++) {
-             for (let y = 0; y < HEIGHT; y++) {
-                 const colorIndices = getColorIndicesForCoord(x, y, WIDTH);
-                 const [redIndex, greenIndex, blueIndex, alphaIndex] = colorIndices;
-                 const [r, g, b, a] = [canvasData[redIndex], canvasData[greenIndex], canvasData[blueIndex], canvasData[alphaIndex]];
-                 const prgb = widejoyData[x][y].rgb;
+        let errors = []
+        totalIncorrect = 0;
+        totalPixels = 0;
+        for (let x = 0; x < WIDTH; x++) {
+            for (let y = 0; y < HEIGHT; y++) {
+                const colorIndices = getColorIndicesForCoord(x, y, WIDTH);
+                const [redIndex, greenIndex, blueIndex, alphaIndex] = colorIndices;
+                const [r, g, b, a] = [canvasData[redIndex], canvasData[greenIndex], canvasData[blueIndex], canvasData[alphaIndex]];
+                const prgb = widejoyData[x][y].rgb;
 
-                 if (widejoyData[x][y] !== "NOCOLOR") {
-                     totalPixels++;
-                     if (r !== prgb.r || g !== prgb.g || b !== prgb.b) {
-                         errors.push({coords: {x: x + TOP_LEFT.x, y: y + TOP_LEFT.y}, color: widejoyData[x][y].name})
-                         totalIncorrect++;
-                     }
-                 }
+                if (widejoyData[x][y] !== "NOCOLOR") {
+                    totalPixels++;
+                    if (r !== prgb.r || g !== prgb.g || b !== prgb.b) {
+                        errors.push({coords: {x: x + TOP_LEFT.x, y: y + TOP_LEFT.y}, color: widejoyData[x][y].name})
+                        totalIncorrect++;
+                    }
+                }
 
-             }
-         }
-         console.log("got data (" + totalIncorrect + " incorrect)");
-     } catch (err) {
-         console.log(err);
-         return;
-     }
+            }
+        }
+        console.log("got data (" + totalIncorrect + " incorrect)");
+    } catch (err) {
+        console.log(err);
+        return;
+    }
 }
+
 
 async function getCanvasData(canvasPage) {
     return canvasPage.$eval("pierce/canvas", (cv) => {
@@ -194,9 +177,11 @@ async function getCanvasData(canvasPage) {
     });
 }
 
+
 function sleep(ms) {
     return new Promise(resolve => setTimeout(resolve, ms));
 }
+
 
 // When the client is ready, run this code (only once)
 client.once('ready', async () => {
@@ -219,7 +204,7 @@ client.once('ready', async () => {
 async function sendMessage(channel) {
 
     let imageBuffer = Buffer.from(imageBufferData);
-     const imageAttachment = new MessageAttachment(imageBuffer, "killjoy-status-" + Date.now());
+    const imageAttachment = new MessageAttachment(imageBuffer, "killjoy-status-" + Date.now());
 
     // First generate the embed to be sent
     // depending on if any data has been fetched yet or not
@@ -245,7 +230,7 @@ async function sendMessage(channel) {
                 { name: 'Accuracy', value: percentage.toFixed(3).toString() + "%", inline: true }
                 //{ name: 'Adjusted Accuracy', value: percentageAdjusted.toFixed(3).toString() + "%", inline: true }
             )
-          .setImage(`attachment://${imageAttachment.name}`)
+            .setImage(`attachment://${imageAttachment.name}`)
             .setTimestamp()
             .setFooter({ text: 'Created by DrakonMichael & Histefanhere for r/VALORANT' });
     }
@@ -257,6 +242,7 @@ async function sendMessage(channel) {
         files: [imageAttachment]
     });
 }
+
 
 let config = require("./config.json");
 // Login to Discord with your client's token
