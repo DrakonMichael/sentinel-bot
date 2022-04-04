@@ -179,7 +179,7 @@ async function getErrors(page) {
 
              }
          }
-         console.log("got pixel data");
+         console.log("got data (" + totalIncorrect + " incorrect)");
      } catch (err) {
          console.log(err);
          return;
@@ -195,52 +195,63 @@ async function getCanvasData(canvasPage) {
     });
 }
 
+function sleep(ms) {
+    return new Promise(resolve => setTimeout(resolve, ms));
+}
+
 // When the client is ready, run this code (only once)
-client.once('ready', () => {
-    console.log('Ready!');
+client.once('ready', async () => {
+    console.log('Ready! Preparing to send in 20 seconds...');
+
+    await sleep(20 * 1000);
+    
+    let ACCURACY_UPDATES_CHANNEL = '960042266905444382';
+    client.channels.fetch(ACCURACY_UPDATES_CHANNEL)
+        .then(channel => {
+            sendMessage(channel);
+            setInterval(() => {
+                sendMessage(channel);
+            }, 1000*(5*60))
+        })
+        .catch(console.error);
 });
 
 
-const getDataEmbed = () => {
+async function sendMessage(channel) {
 
-    if(totalPixels === 0) {
-           return new MessageEmbed()
-               .setColor('#ff6666')
-               .setTitle('Waiting for pixel data...')
+    // First generate the embed to be sent
+    // depending on if any data has been fetched yet or not
+    let embed = null;
+    if (totalPixels === 0) {
+        embed = new MessageEmbed()
+            .setColor('#ff6666')
+            .setTitle('Waiting for pixel data...')
+    }
+    else {
+        let percentage = ((totalPixels-totalIncorrect)/totalPixels)*100;
+
+        embed = new MessageEmbed()
+            .setColor('#ff6666')
+            .setTitle('Widejoy Progress Update')
+            .setDescription('**NARROW THEIR OPTIONS // WIDEN OUR JOY** <:perfectwidejoy:960300099060265071>')
+            .addFields(
+                { name: 'Correct Tiles', value: (totalPixels-totalIncorrect).toString(), inline: true },
+                { name: 'Incorrect Tiles', value: (totalIncorrect).toString(), inline: true },
+                { name: 'Progress', value: `${totalPixels-totalIncorrect}/${totalPixels}`, inline: true },
+                //{ name: 'Adjusted Progress', value: `${totalPixels-totalIncorrect + adjustmentFactor}/${totalPixels}`, inline: true },
+                { name: 'Accuracy', value: percentage.toFixed(3).toString() + "%", inline: true }
+                //{ name: 'Adjusted Accuracy', value: percentageAdjusted.toFixed(3).toString() + "%", inline: true }
+            )
+            .setTimestamp()
+            .setFooter({ text: 'Created by DrakonMichael & Histefanhere for r/VALORANT' });
     }
 
-    let percentage = ((totalPixels-totalIncorrect)/totalPixels)*100;
-
-    const embed = new MessageEmbed()
-        .setColor('#ff6666')
-        .setTitle('Widejoy Progress Update')
-        .setDescription('NARROW THEIR OPTIONS // WIDEN OUR JOY')
-        .addFields(
-            { name: 'Correct Tiles', value: (totalPixels-totalIncorrect).toString(), inline: true },
-            { name: 'Incorrect Tiles', value: (totalIncorrect).toString(), inline: true },
-            { name: 'Progress', value: `${totalPixels-totalIncorrect}/${totalPixels}`, inline: true },
-            //{ name: 'Adjusted Progress', value: `${totalPixels-totalIncorrect + adjustmentFactor}/${totalPixels}`, inline: true },
-            { name: 'Accuracy', value: percentage.toFixed(3).toString() + "%", inline: true }
-            //{ name: 'Adjusted Accuracy', value: percentageAdjusted.toFixed(3).toString() + "%", inline: true }
-        )
-        .setTimestamp()
-        .setFooter({ text: 'Created by DrakonMichael for r/VALORANT' });
-
-    return embed;
+    // Send the messeage to the provided channel!
+    console.log("Sending message... (Incorrect tiles: " + (totalIncorrect).toString() + ")");
+    channel.send({
+        embeds: [embed]
+    });
 }
-
-client.on("messageCreate", (msg) => {
-    if(msg.author.id == 188031012444307457 || msg.author.id == 299087607948902401) {
-        if(msg.content === ".link") {
-            console.log("link");
-            msg.reply("Linked to this channel")
-            msg.channel.send({ embeds: [getDataEmbed()] });
-            setInterval(() => {
-                msg.channel.send({ embeds: [getDataEmbed()] });
-            }, 1000*(5*60))
-        }
-    }
-})
 
 let config = require("./config.json");
 // Login to Discord with your client's token
