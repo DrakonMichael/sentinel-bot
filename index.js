@@ -176,9 +176,7 @@ const getDataEmbed = () => {
                .setTitle('Waiting for pixel data...')
     }
 
-    let adjustmentFactor = 25;
     let percentage = ((totalPixels-totalIncorrect)/totalPixels)*100;
-    let percentageAdjusted = ((totalPixels-totalIncorrect + adjustmentFactor)/totalPixels)*100;
 
     const embed = new MessageEmbed()
         .setColor('#ff6666')
