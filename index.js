@@ -2,7 +2,7 @@ const puppeteer = require('puppeteer');
 const fs = require('fs');
 let Jimp = require('jimp');
 let accounts = require("./accounts.json");
-const { createCanvas, Image } = require("canvas");
+const { createCanvas, Image, Canvas } = require("canvas");
 // Require the necessary discord.js classes
 const { Client, Intents, MessageEmbed, MessageAttachment } = require('discord.js');
 
@@ -201,8 +201,35 @@ async function sendMessage(channel) {
     let {totalPixels, totalIncorrect} = await getErrors();
     let percentage = ((totalPixels-totalIncorrect)/totalPixels)*100;
 
-    let imageBuffer = Buffer.from(imageBufferData);
-    const imageAttachment = new MessageAttachment(imageBuffer, "killjoy-status-" + Date.now());
+    // Here we create a canvas and scale up the widejoy, and also put a pixel inside wrong ones
+    // showing the right colour for that tile
+    let scale = 3;
+    let canvas = new Canvas(WIDTH * scale, HEIGHT * scale);
+    const context = canvas.getContext("2d");
+    let im = context.createImageData(1, 1);
+    for (let x = 0; x < WIDTH * scale; x++) {
+        for (let y = 0; y < HEIGHT * scale; y++) {
+            const colorIndices = getColorIndicesForCoord(Math.floor(x/scale), Math.floor(y/scale), WIDTH);
+            const [ri, gi, bi, ai] = colorIndices;
+            im.data[0] = imageBufferData[ri];
+            im.data[1] = imageBufferData[gi];
+            im.data[2] = imageBufferData[bi];
+            im.data[3] = 255;
+            context.putImageData(im, x, y);
+        }
+    }
+    for (let x = 0; x < WIDTH; x++) {
+        for (let y = 0; y < HEIGHT; y++) {
+            const prgb = widejoyData[x][y].rgb;
+            im.data[0] = prgb.r;
+            im.data[1] = prgb.g;
+            im.data[2] = prgb.b;
+            im.data[3] = 255
+            context.putImageData(im, scale * x + 1, scale * y + 1);
+        }
+    }
+
+    const imageAttachment = new MessageAttachment(canvas.toBuffer(), "killjoy-status-" + Date.now() + '.jpg');
 
     embed = new MessageEmbed()
         .setColor('#ff6666')
