@@ -3,6 +3,7 @@ const fs = require('fs');
 let Jimp = require('jimp');
 let widejoyData = require("./imgdata.json");
 let accounts = require("./accounts.json");
+const { createCanvas } = require("canvas");
 // Require the necessary discord.js classes
 const { Client, Intents, MessageEmbed } = require('discord.js');
 
@@ -20,8 +21,16 @@ let TOP_LEFT = {x: 110, y: 805}
 let WIDTH = 120
 let HEIGHT = 25
 
+let DEBUG_GENERATE_IMAGE_FROM_IMGDATA = false;
+
 Jimp.read('./input.png', (err, img) => {
     if (err) throw err;
+
+    const canvas = createCanvas(120, 25);
+    const context = canvas.getContext("2d");
+    let im = context.createImageData(1, 1);
+    let d = im.data;
+
     let arr = [];
     for(let x = 0; x < WIDTH; x++) {
         for(let y = 0; y < HEIGHT; y++) {
@@ -31,30 +40,48 @@ Jimp.read('./input.png', (err, img) => {
             }
 
             let {r, g, b, a} = color;
-            let name = "";
 
-            if(r === 0 && g === 0 && b === 0) { name = "black" };
-            if(r === 81 && g === 233 && b === 244) { name = "light blue" };
-            if(r === 255 && g === 255 && b === 255) { name = "white" };
-            if(r === 137 && g === 141 && b === 144) { name = "gray" };
-            if(r === 156 && g === 105 && b === 38) { name = "brown" };
-            if(r === 255 && g === 153 && b === 170) { name = "light pink" };
-            if(r === 180 && g === 74 && b === 192) { name = "purple" };
-            if(r === 129 && g === 30 && b === 159) { name = "dark purple" };
-            if(r === 212 && g === 215 && b === 217) { name = "light gray" };
-            if(r === 255 && g === 214 && b === 53) { name = "yellow" };
-            if(r === 36 && g === 80 && b === 164) { name = "dark blue" };
-            if(r === 255 && g === 69 && b === 0) { name = "red" };
-            if(r === 255 && g === 168 && b === 0) { name = "orange" };
-            if(r === 126 && g === 237 && b === 86) { name = "light green" };
-            if(r === 0 && g === 163 && b === 104) { name = "dark green" };
-            if(r === 54 && g === 144 && b === 234) { name = "blue" };
-            if(r === 69 && g === 69 && b === 69) { name = "NOCOLOR" };
-
-            if(name === "") {
-                console.log("ERROR! Tile " + x + "," + y + " MISSING COLOR");
-                process.exit(1);
+            let colours = {
+                "black": [0, 0, 0],
+                "light blue": [81, 233, 244],
+                "white": [255, 255, 255],
+                "gray": [137, 141, 144],
+                "brown": [156, 105, 38],
+                "light pink": [255, 153, 170],
+                "purple": [180, 74, 192],
+                "dark purple": [129, 30, 159],
+                "light gray": [212, 215, 217],
+                "yellow": [255, 214, 53],
+                "dark blue": [36, 80, 164],
+                "red": [255, 69, 0],
+                "orange": [255, 168, 0],
+                "light green": [126, 237, 86],
+                "dark green": [0, 163, 104],
+                "blue": [54, 144, 234],
+                "NOCOLOR": [69, 69, 69]
             }
+
+            // Find the closest pixel
+            let name = "black";
+            let closestDistance = 99999999;
+            for (const [colName, col] of Object.entries(colours)) {
+                let dist = Math.sqrt( (r - col[0])**2 + (g - col[1])**2 + (b - col[2])**2);
+                if (dist < closestDistance) {
+                    name = colName;
+                    closestDistance = dist;
+                }
+            }
+
+            // Update to the exact colour
+            color[0] = colours[name][0];
+            color[1] = colours[name][1];
+            color[2] = colours[name][2];
+
+            d[0] = colours[name][0];
+            d[1] = colours[name][1];
+            d[2] = colours[name][2];
+            d[3] = a;
+            context.putImageData(im, x, y);
 
             let c = {rgb: color, name: name};
 
@@ -62,7 +89,13 @@ Jimp.read('./input.png', (err, img) => {
             arr[x][y] = c;
         }
     }
+    widejoyData = arr;
     fs.writeFileSync('imgdata.json', JSON.stringify(arr));
+
+    if (DEBUG_GENERATE_IMAGE_FROM_IMGDATA) {
+        const buffer = canvas.toBuffer("image/png");
+        fs.writeFileSync("./imgdata_visualized.png", buffer);
+    }
 });
 
 const getColorIndicesForCoord = (x, y, width) => {
@@ -97,7 +130,7 @@ createAccount(username, password);
         ad[username].action = "Redirecting to r/place";
 
         getErrors(page);
-        setInterval(() => {getErrors(page);}, 30000)
+        setInterval(() => {getErrors(page);}, 60000)
 
 }
 
@@ -197,7 +230,7 @@ const getDataEmbed = () => {
 }
 
 client.on("messageCreate", (msg) => {
-    if(msg.author.id == 188031012444307457) {
+    if(msg.author.id == 188031012444307457 || msg.author.id == 299087607948902401) {
         if(msg.content === ".link") {
             console.log("link");
             msg.reply("Linked to this channel")
