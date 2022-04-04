@@ -3,9 +3,9 @@ const fs = require('fs');
 let Jimp = require('jimp');
 let widejoyData = require("./imgdata.json");
 let accounts = require("./accounts.json");
-const { createCanvas } = require("canvas");
+const { createCanvas, Image } = require("canvas");
 // Require the necessary discord.js classes
-const { Client, Intents, MessageEmbed } = require('discord.js');
+const { Client, Intents, MessageEmbed, MessageAttachment } = require('discord.js');
 
 // Create a new client instance
 const client = new Client({ intents: [Intents.FLAGS.GUILDS, Intents.FLAGS.GUILD_MESSAGES] });
@@ -16,6 +16,7 @@ const client = new Client({ intents: [Intents.FLAGS.GUILDS, Intents.FLAGS.GUILD_
 let ad = {};
 let totalPixels = 0;
 let totalIncorrect = 0;
+let imageBufferData = [];
 
 let TOP_LEFT = {x: 110, y: 805}
 let WIDTH = 120
@@ -92,10 +93,6 @@ Jimp.read('./input.png', (err, img) => {
     widejoyData = arr;
     fs.writeFileSync('imgdata.json', JSON.stringify(arr));
 
-    if (DEBUG_GENERATE_IMAGE_FROM_IMGDATA) {
-        const buffer = canvas.toBuffer("image/png");
-        fs.writeFileSync("./imgdata_visualized.png", buffer);
-    }
 });
 
 const getColorIndicesForCoord = (x, y, width) => {
@@ -159,6 +156,8 @@ async function getErrors(page) {
              }
          }
 
+         imageBufferData = [...canvasData];
+
          let errors = []
          totalIncorrect = 0;
          totalPixels = 0;
@@ -219,6 +218,9 @@ client.once('ready', async () => {
 
 async function sendMessage(channel) {
 
+    let imageBuffer = Buffer.from(imageBufferData);
+     const imageAttachment = new MessageAttachment(imageBuffer, "killjoy-status-" + Date.now());
+
     // First generate the embed to be sent
     // depending on if any data has been fetched yet or not
     let embed = null;
@@ -229,6 +231,7 @@ async function sendMessage(channel) {
     }
     else {
         let percentage = ((totalPixels-totalIncorrect)/totalPixels)*100;
+
 
         embed = new MessageEmbed()
             .setColor('#ff6666')
@@ -242,6 +245,7 @@ async function sendMessage(channel) {
                 { name: 'Accuracy', value: percentage.toFixed(3).toString() + "%", inline: true }
                 //{ name: 'Adjusted Accuracy', value: percentageAdjusted.toFixed(3).toString() + "%", inline: true }
             )
+          .setImage(`attachment://${imageAttachment.name}`)
             .setTimestamp()
             .setFooter({ text: 'Created by DrakonMichael & Histefanhere for r/VALORANT' });
     }
@@ -249,7 +253,8 @@ async function sendMessage(channel) {
     // Send the messeage to the provided channel!
     console.log("Sending message... (Incorrect tiles: " + (totalIncorrect).toString() + ")");
     channel.send({
-        embeds: [embed]
+        embeds: [embed],
+        files: [imageAttachment]
     });
 }
 
